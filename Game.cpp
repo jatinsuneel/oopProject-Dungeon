@@ -277,6 +277,21 @@ void Game::movePlayer(int dx, int dy) {
         extraInventory.add("Treasure");
         dungeon.setCell(newX, newY, '.');
         showGUIMessage("Treasure Found!", "You collected the treasure! Now find the exit E.");
+    } else if (cell == 'E') {
+        if (player.hasTreasure()) {
+            if (dungeon.isLastLevel()) {
+                scores.push_back(player.getHealth());
+                showGUIMessage("Victory!", "You escaped the final dungeon! Congratulations, " + playerName + "!");
+                gameOver = true;
+            } else {
+                showGUIMessage("Level Complete!", "Moving to the next level. Stay sharp!");
+                dungeon.nextLevel();
+                resetForNextLevel();
+            }
+        } else {
+            showGUIMessage("No Treasure!", "You need to collect the Treasure (T) first!\nRestarting this level...");
+            resetCurrentLevel();
+        }
     }
 }
 
@@ -371,26 +386,37 @@ void Game::resetForNextLevel() {
     setupMonstersForLevel();
 }
 
+void Game::resetCurrentLevel() {
+    // Restore the treasure tile so the player can collect it again
+    int rows = dungeon.getHeight();
+    int cols = dungeon.getWidth();
+    // The treasure was removed from the map when collected; reload the level
+    // by scanning for a missing T. We track via a saved position in setupMonstersForLevel.
+    // Simplest approach: rebuild the dungeon cell map from the original level data.
+    // Since Dungeon stores levels as a mutable 3D array, we restore T by re-initialising
+    // the current level. We do this by re-running the Dungeon constructor logic inline —
+    // instead, we store original levels. The cleanest fix here: reset inventory + position
+    // and restore 'T' by calling dungeon.restoreTreasure() — but since we don't have that,
+    // we recreate the Dungeon object at the same level index via a helper.
+    // 
+    // Practical solution: reconstruct a fresh Dungeon, advance to the same level number,
+    // then copy its tile data back into the current dungeon.
+    int targetLevel = dungeon.getCurrentLevelNumber() - 1; // 0-indexed
+    Dungeon freshDungeon;
+    for (int i = 0; i < targetLevel; i++) freshDungeon.nextLevel();
+    // Copy tile data back row by row
+    for (int y = 0; y < rows; y++)
+        for (int x = 0; x < cols; x++)
+            dungeon.setCell(x, y, freshDungeon.getCell(x, y));
+
+    while (!previousMoves.empty()) previousMoves.pop();
+    player.clearInventory();
+    player.setPosition(1, 1);
+    setupMonstersForLevel();
+}
+
 void Game::checkGameStatus() {
     handleMonsterAttack();
-    if (gameOver) return;
-
-    char cell = dungeon.getCell(player.getX(), player.getY());
-    if (cell == 'E') {
-        if (player.hasTreasure()) {
-            if (dungeon.isLastLevel()) {
-                scores.push_back(player.getHealth());
-                showGUIMessage("Victory!", "You escaped the final dungeon! Congratulations, " + playerName + "!");
-                gameOver = true;
-            } else {
-                showGUIMessage("Level Complete!", "Moving to the next level. Stay sharp!");
-                dungeon.nextLevel();
-                resetForNextLevel();
-            }
-        } else {
-            showGUIMessage("Not Yet!", "You need to collect the Treasure T first!");
-        }
-    }
 }
 
 int Game::recursiveBonus(int n) {
