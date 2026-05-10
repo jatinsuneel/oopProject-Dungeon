@@ -49,6 +49,7 @@ public:
 
     void setupMonstersForLevel();
     void resetForNextLevel();
+    void resetCurrentLevel();
     void checkGameStatus();
 
     int recursiveBonus(int n);
